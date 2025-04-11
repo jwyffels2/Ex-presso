@@ -1,17 +1,17 @@
-package psu.excel.model;
+package psu.expresso.model;
 
 import java.util.function.Consumer;
 
 /**
- * A concrete Cell class that holds a value of type Type.
+ * A concrete CellDataModel class that holds a value of type Type.
  * This class is observable and can both notify and observe other cells.
  */
-public class Cell<Type> extends Observable<Cell<?>> implements CellIF<Type> {
+public class CellDataModel<Type> extends Observable<CellDataModel<?>> implements CellDataModelIF<Type> {
 
     private Type value;
 
     // A lambda that an observer can set to define how it updates when notified.
-    private Consumer<Cell<?>> updateLambda;
+    private Consumer<CellDataModel<?>> updateLambda;
 
     /**
      * Sets the cell's value and notifies observers of the change.
@@ -33,9 +33,9 @@ public class Cell<Type> extends Observable<Cell<?>> implements CellIF<Type> {
      * Sets the update function for this cell. If this cell is an observing another cell,
      * this lambda will be executed when it is notified.
      *
-     * @param lambda a Consumer that accepts a Cell<?> as its input.
+     * @param lambda a Consumer that accepts a CellDataModel<?> as its input.
      */
-    public void OnUpdate(Consumer<Cell<?>> lambda) {
+    public void OnUpdate(Consumer<CellDataModel<?>> lambda) {
         this.updateLambda = lambda;
     }
 
@@ -46,7 +46,7 @@ public class Cell<Type> extends Observable<Cell<?>> implements CellIF<Type> {
      * @param observer the observer being notified (i.e. this cell's update lambda will be called).
      */
     @Override
-    protected void notifyObserver(Cell<?> observer) {
+    protected void notifyObserver(CellDataModel<?> observer) {
         if (observer.updateLambda == null) {
             // Fallback behavior: simply print a message.
             System.out.println("Notifying observer: " + observer);
@@ -57,6 +57,6 @@ public class Cell<Type> extends Observable<Cell<?>> implements CellIF<Type> {
 
     @Override
     public String toString() {
-        return "Cell [value=" + value + "]";
+        return "CellDataModel [value=" + value + "]";
     }
 }

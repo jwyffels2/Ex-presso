@@ -1,4 +1,4 @@
-package psu.excel.model;
+package psu.expresso.model;
 
 public class Spreadsheet {
     /*

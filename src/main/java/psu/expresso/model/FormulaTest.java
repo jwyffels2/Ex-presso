@@ -1,12 +1,12 @@
-package psu.excel.model;
+package psu.expresso.model;
 import groovy.lang.Binding;
 import groovy.lang.GroovyShell;
 
 public class FormulaTest {
     public static void main(String[] args) {
-        // Create an instance of a Cell and set an initial value.
-        Cell<String> cellA = new Cell<>();
-        cellA.setValue("Initial Value");
+        // Create an instance of a CellDataModel and set an initial value.
+        CellDataModel<String> cellDataModelA = new CellDataModel<>();
+        cellDataModelA.setValue("Initial Value");
 
         // Create a binding and expose the cell with a variable name.
         Binding binding = new Binding();
@@ -17,9 +17,9 @@ public class FormulaTest {
 
         // Groovy script that reads the cell value and updates it.
         String script =
-                "println \"CellA's initial value: \" + cellA.value\n" +
+                "println \"CellA's initial value: \" + cellDataModelA.value\n" +
                         "cellA.value= 'Updated via Groovy!'\n" +
-                        "return cellA.value";
+                        "return cellDataModelA.value";
 
         // Execute the script.
         Object updatedValue = shell.evaluate(script);

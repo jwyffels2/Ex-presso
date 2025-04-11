@@ -1,4 +1,4 @@
-module psu.excel {
+module psu.expresso {
     requires javafx.controls;
     requires javafx.fxml;
     requires java.sql;
@@ -8,8 +8,8 @@ module psu.excel {
     requires org.kordamp.bootstrapfx.core;
     requires org.apache.groovy;
 
-    opens psu.excel to javafx.fxml;
-    exports psu.excel;
-    exports psu.excel.model;
+    opens psu.expresso to javafx.fxml;
+    exports psu.expresso;
+    exports psu.expresso.model;
 
 }

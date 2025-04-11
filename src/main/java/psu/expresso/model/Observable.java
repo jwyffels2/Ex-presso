@@ -1,4 +1,4 @@
-package psu.excel.model;
+package psu.expresso.model;
 
 import java.util.ArrayList;
 import java.util.Collections;
