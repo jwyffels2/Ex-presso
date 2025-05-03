@@ -1,0 +1,23 @@
+.table-view .column-header-background {
+    -fx-background-color: linear-gradient(#f0f0f0, #dcdcdc);
+}
+.table-view {
+    -fx-table-cell-border-color: #e0e0e0;
+    -fx-border-color: #e0e0e0;
+}
+.table-row-cell:selected {
+    -fx-background-color: transparent;
+}
+.table-cell:selected {
+    -fx-background-color: -fx-focus-color;
+}
+.tool-bar {
+    -fx-background-color: #ececec;
+}
+.tool-bar .button {
+    -fx-background-radius: 0;
+    -fx-background-color: transparent;
+}
+.tool-bar .button:hover {
+    -fx-background-color: rgba(0,0,0,0.05);
+}

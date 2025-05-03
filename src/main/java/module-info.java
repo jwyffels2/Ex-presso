@@ -7,6 +7,7 @@ module psu.expresso {
     requires com.dlsc.formsfx;
     requires org.kordamp.bootstrapfx.core;
     requires org.apache.groovy;
+    requires java.desktop;
 
     opens psu.expresso to javafx.fxml;
     exports psu.expresso;
