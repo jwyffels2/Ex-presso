@@ -11,7 +11,7 @@ import java.util.List;
 public class FormulaArg {
     public enum DataType { LITERAL, CELL_REF, CELL_RANGE }
 
-    // ← a static reference to your spreadsheet model, set at startup
+    // ← a static reference to our spreadsheet model, set at startup
     private static SpreadsheetModel<Object> model;
 
     /** Must be called once at startup so asNumber()/asText() can look up cells */

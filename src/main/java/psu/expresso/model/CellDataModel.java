@@ -1,3 +1,4 @@
+// src/main/java/psu/expresso/model/CellDataModel.java
 package psu.expresso.model;
 
 import java.util.function.Consumer;
@@ -6,7 +7,7 @@ import javafx.beans.property.SimpleObjectProperty;
 
 /**
  * Holds:
- *  • value:       raw input (formula or literal)
+ *  • value:        raw input (formula or literal)
  *  • displayValue: computed result for display
  */
 public class CellDataModel<T>
@@ -46,7 +47,9 @@ public class CellDataModel<T>
     }
     @Override
     protected void notifyObserver(CellDataModel<T> obs) {
-        if (obs.updateLambda != null) obs.updateLambda.accept(this);
+        if (obs.updateLambda != null) {
+            obs.updateLambda.accept(this);
+        }
     }
 
     @Override

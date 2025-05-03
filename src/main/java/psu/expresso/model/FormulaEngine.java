@@ -2,23 +2,27 @@ package psu.expresso.model;
 
 import groovy.lang.Binding;
 import groovy.lang.GroovyShell;
+
 import java.awt.Point;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
 import javafx.application.Platform;
+import javafx.scene.control.Alert;
+import javafx.scene.control.Alert.AlertType;
 
 /**
- * Evaluates “=A1 + SUM(B1:B3)”-style formulas,
- * now with support for unquoted ranges like A1:B3.
+ * Installs and evaluates "=A1 + SUM(B1:B3)"-style formulas.
+ *
+ * Now properly clears out old observer links (via unobserve),
+ * then wires up new ones, so SELF_OBSERVATION and CYCLE_DETECTED
+ * are caught every time.
  */
 public class FormulaEngine {
-    // matches single cell refs (A1, B12, AA100, etc.)
     private static final Pattern REF_PATTERN   = Pattern.compile("([A-Za-z]+\\d+)");
-    // matches ranges (A1:B3, C5:D10), optionally with spaces around the colon
     private static final Pattern RANGE_PATTERN = Pattern.compile("([A-Za-z]+\\d+)\\s*:\\s*([A-Za-z]+\\d+)");
-
     private final SpreadsheetModel<Object> model;
 
     public FormulaEngine(SpreadsheetModel<Object> model) {
@@ -27,83 +31,109 @@ public class FormulaEngine {
     }
 
     /**
-     * Install a formula into (row,col).  Whenever any dependency changes,
-     * we re-run and store the result in displayValue.
+     * Apply the formula text into the target cell (row,col), clear out
+     * any old observer links, then re‐wire to exactly the new dependencies.
      */
     public void applyFormula(String rawFormula, int targetRow, int targetCol) {
         CellDataModel<Object> target = model.getOrCreateCell(targetRow, targetCol);
 
-        // 1) store the user's raw text
-        target.setValue(rawFormula);
+        // ─── 1) Unobserve all old refs from the previous formula ───────────
+        Object prev = target.getValue();
+        if (prev instanceof String prevS && prevS.startsWith("=")) {
+            String oldExpr = prevS.substring(1);
+            for (String oldRef : extractRefs(oldExpr)) {
+                Point pOld = CellRef.parse(oldRef);
+                model.getCellIfExists(pOld.x, pOld.y)
+                        .ifPresent(src -> target.unobserve(src));
+            }
+        }
 
-        // 2) re-evaluate on any update (raw text or any observed cell)
+        // ─── 2) Store the raw formula and hook re‐evaluation ──────────────
+        target.setValue(rawFormula);
         target.OnUpdate(src ->
                 Platform.runLater(() -> evaluateAndStore(target))
         );
 
-        // 3) observe each single‐cell ref so updates cascade
+        // ─── 3) Observe each new dependency, catching real errors ─────────
         String expr = rawFormula.startsWith("=")
                 ? rawFormula.substring(1)
                 : rawFormula;
+
         for (String ref : extractRefs(expr)) {
             Point p = CellRef.parse(ref);
-            target.observe(model.getOrCreateCell(p.x, p.y));
+            CellDataModel<Object> source = model.getOrCreateCell(p.x, p.y);
+
+            Observable.ErrorCodes code = target.observe(source);
+            switch (code) {
+                case SUCCESS:
+                case DUPLICATE:
+                    // OK: either new link, or we already had it
+                    break;
+
+                case SELF_OBSERVATION:
+                    popup("Formula Error",
+                            "Cell cannot reference itself (" + ref + ").");
+                    model.removeCell(targetRow, targetCol);
+                    return;
+
+                case CYCLE_DETECTED:
+                    popup("Formula Error",
+                            "That reference would introduce a cycle at " + ref + ".");
+                    model.removeCell(targetRow, targetCol);
+                    return;
+
+                default:
+                    popup("Observer Error",
+                            "Cannot watch cell " + ref + ": " + code);
+                    model.removeCell(targetRow, targetCol);
+                    return;
+            }
         }
 
-        // 4) initial evaluation
+        // ─── 4) Initial evaluation ────────────────────────────────────────
         evaluateAndStore(target);
     }
 
-    /** Find all single refs (A1, B2, …) in the expression. */
+    /** Find all A1‐style single references in the expression. */
     private Set<String> extractRefs(String expr) {
         Matcher m = REF_PATTERN.matcher(expr);
         Set<String> out = new LinkedHashSet<>();
-        while (m.find()) out.add(m.group(1).toUpperCase());
+        while (m.find()) {
+            out.add(m.group(1).toUpperCase());
+        }
         return out;
     }
 
-    /**
-     * Turns "A1:B3" into the Groovy string literal "'A1:B3'".
-     * That way SUM('A1:B3') passes a real String into SUM().
-     */
+    /** Wrap any A1:B3 into "'A1:B3'" so SUM sees it as a literal range. */
     private String quoteRanges(String expr) {
         Matcher m = RANGE_PATTERN.matcher(expr);
         StringBuffer sb = new StringBuffer();
         while (m.find()) {
-            // group(1) is start ref, group(2) is end ref
             String start = m.group(1).toUpperCase();
             String end   = m.group(2).toUpperCase();
-            String quoted = "'" + start + ":" + end + "'";
-            m.appendReplacement(sb, quoted);
+            m.appendReplacement(sb, "'" + start + ":" + end + "'");
         }
         m.appendTail(sb);
         return sb.toString();
     }
 
     /**
-     * Build and run the Groovy script, then write the
-     * result into target.setDisplayValue(...).
+     * Evaluate the formula in target.getValue() with Groovy,
+     * write the result into target.setDisplayValue(...).
      */
     private void evaluateAndStore(CellDataModel<Object> target) {
         Object raw = target.getValue();
-        // non-formula → echo it straight through
         if (!(raw instanceof String s) || !s.startsWith("=")) {
+            // not a formula → echo it
             target.setDisplayValue(raw);
             return;
         }
 
-        // 1) strip "="
-        String expr = s.substring(1);
-
-        // 2) convert any A1:B3 → "'A1:B3'"
-        expr = quoteRanges(expr);
-
-        // 3) build the script with static imports for SUM, AVG, etc.
+        String expr   = quoteRanges(s.substring(1));
         String script =
                 "import static psu.expresso.model.FormulaFunctions.*\n" +
                         "return (" + expr + ")";
 
-        // 4) bind each single‐cell ref name to its displayValue
         Binding binding = new Binding();
         for (String ref : extractRefs(expr)) {
             Point p = CellRef.parse(ref);
@@ -113,7 +143,6 @@ public class FormulaEngine {
             binding.setVariable(ref, dv);
         }
 
-        // 5) evaluate and catch errors
         Object result;
         try {
             result = new GroovyShell(binding).evaluate(script);
@@ -121,7 +150,17 @@ public class FormulaEngine {
             result = "#ERROR";
         }
 
-        // 6) store into displayValue (fires downstream observers)
         target.setDisplayValue(result);
+    }
+
+    /** Show an alert on the FX thread. */
+    private void popup(String title, String msg) {
+        Platform.runLater(() -> {
+            Alert alert = new Alert(AlertType.ERROR);
+            alert.setTitle(title);
+            alert.setHeaderText(null);
+            alert.setContentText(msg);
+            alert.showAndWait();
+        });
     }
 }

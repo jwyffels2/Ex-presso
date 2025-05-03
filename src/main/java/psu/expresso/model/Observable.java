@@ -36,6 +36,13 @@ public abstract class Observable<T extends Observable<T>> {
         observers.remove(observer);
     }
 
+    /**
+     * Clears <em>all</em> observers at once.
+     */
+    protected void deleteObservers() {
+        observers.clear();
+    }
+
     protected void notifyObservers() {
         for (T obs : observers) {
             notifyObserver(obs);
