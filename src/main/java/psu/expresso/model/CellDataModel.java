@@ -12,7 +12,7 @@ import javafx.beans.property.SimpleObjectProperty;
  */
 public class CellDataModel<T>
         extends Observable<CellDataModel<T>>
-        implements CellDataModelIF<T>
+        implements CellDataModelIF<T>, DecoratorIF
 {
     private final ObjectProperty<T> value        = new SimpleObjectProperty<>();
     private final ObjectProperty<T> displayValue = new SimpleObjectProperty<>();
@@ -55,5 +55,11 @@ public class CellDataModel<T>
     @Override
     public String toString() {
         return "Cell{" + getDisplayValue() + "}";
+    }
+
+    @Override
+    public String displayValue() {
+        T dv = getDisplayValue();
+        return dv != null ? dv.toString() : "";
     }
 }
