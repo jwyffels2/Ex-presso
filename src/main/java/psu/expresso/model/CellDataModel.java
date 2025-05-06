@@ -4,6 +4,7 @@ package psu.expresso.model;
 import java.util.function.Consumer;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleObjectProperty;
+import java.awt.Point; // Adds Java Point.
 
 /**
  * Holds:
@@ -17,6 +18,12 @@ public class CellDataModel<T>
     private final ObjectProperty<T> value        = new SimpleObjectProperty<>();
     private final ObjectProperty<T> displayValue = new SimpleObjectProperty<>();
     private Consumer<CellDataModel<T>> updateLambda;
+    private DecoratorIF wrappedCell; // This will store the decorator.
+
+    // Set the decorator, e.g., to apply font styling
+    public void setDecorator(DecoratorIF decorator) {
+        this.wrappedCell = decorator;
+    }
 
     @Override
     public T getValue() {
@@ -57,9 +64,19 @@ public class CellDataModel<T>
         return "Cell{" + getDisplayValue() + "}";
     }
 
+    // Adds Point Location.
+    private Point location;
+
+    public void setLocation(Point location) {
+        this.location = location;
+    }
+    public Point getLocation() {
+        return location;
+    }
+
+    // Useful for Decorator.
     @Override
     public String displayValue() {
-        T dv = getDisplayValue();
-        return dv != null ? dv.toString() : "";
+        return wrappedCell.displayValue();
     }
 }

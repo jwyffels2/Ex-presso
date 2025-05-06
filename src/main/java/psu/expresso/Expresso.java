@@ -12,14 +12,15 @@ import javafx.scene.layout.BorderPane;
 import javafx.stage.Stage;
 import javafx.util.StringConverter;
 import psu.expresso.model.*;
+import java.util.List;
 
 public class Expresso extends Application {
     private static final int NUM_ROWS = 1000;
-    private static final int NUM_COLS =    50;
+    private static final int NUM_COLS = 50;
 
     private SpreadsheetModel<Object> model;
-    private FormulaEngine          engine;
-    private TableView<Integer>     table;
+    private FormulaEngine engine;
+    private TableView<Integer> table;
 
     /** Parses raw text → Double or String; blank→null */
     private final StringConverter<Object> dynamicConverter = new StringConverter<>() {
@@ -65,7 +66,9 @@ public class Expresso extends Application {
         tv.setEditable(true);
         tv.setFixedCellSize(24);
         tv.getSelectionModel().setCellSelectionEnabled(true);
-        tv.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);
+
+        // Allow multiple cells to be selected
+        tv.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
 
         tv.getColumns().add(rowNumberColumn());
         for (int c = 0; c < NUM_COLS; c++) {
@@ -139,7 +142,7 @@ public class Expresso extends Application {
             }
             private void commitEditFromEditor() {
                 String raw = editor.getText();
-                int    row = getIndex();
+                int row = getIndex();
                 if (raw == null || raw.isEmpty()) {
                     model.removeCell(row, ci);
                 } else if (raw.startsWith("=")) {
@@ -185,6 +188,11 @@ public class Expresso extends Application {
             table.refresh();
         });
 
+        Button filterButton = new Button("Filter");
+        filterButton.setOnAction(ev -> {
+            showFilterPopup();
+        });
+
         return new ToolBar(
                 new Button("New"),
                 new Button("Open"),
@@ -193,8 +201,96 @@ public class Expresso extends Application {
                 new Button("Undo"),
                 new Button("Redo"),
                 new Separator(),
-                new Label("fx:"), fx
+                new Label("fx:"), fx,
+                new Separator(), filterButton
         );
+    }
+
+    private void showFilterPopup() {
+        TextField filterInput = new TextField();
+        filterInput.setPromptText("Enter filter value or range");
+
+        ButtonType valueButton = new ButtonType("Filter by Value");
+        ButtonType typeButton = new ButtonType("Filter by Type");
+        ButtonType rangeButton = new ButtonType("Filter by Range");
+        ButtonType cancelButton = new ButtonType("Cancel", ButtonBar.ButtonData.CANCEL_CLOSE);
+
+        Alert filterAlert = new Alert(Alert.AlertType.INFORMATION, "", valueButton, typeButton, rangeButton, cancelButton);
+        filterAlert.setHeaderText("Filter Selection");
+        filterAlert.getDialogPane().setContent(filterInput);
+
+        filterAlert.showAndWait().ifPresent(response -> {
+            String filterCriteria = filterInput.getText().trim();
+            ObservableList<TablePosition> selectedCells = table.getSelectionModel().getSelectedCells();
+
+            if (response == valueButton) {
+                applyValueFilter(selectedCells, filterCriteria);
+            } else if (response == typeButton) {
+                applyTypeFilter(selectedCells, filterCriteria);
+            } else if (response == rangeButton) {
+                applyRangeFilter(selectedCells, filterCriteria);
+            }
+        });
+    }
+
+    private void applyValueFilter(ObservableList<TablePosition> selectedCells, String filterCriteria) {
+        for (TablePosition pos : selectedCells) {
+            var cell = model.getCellIfExists(pos.getRow(), pos.getColumn()).orElse(null);
+            if (cell != null && cell.getValue() != null) {
+                if (!cell.getValue().toString().contains(filterCriteria)) {
+                    table.getSelectionModel().clearSelection(pos.getRow());
+                } else {
+                    table.getSelectionModel().select(pos.getRow());
+                }
+            }
+        }
+    }
+
+    private void applyTypeFilter(ObservableList<TablePosition> selectedCells, String filterCriteria) {
+        try {
+            Class<?> filterType = Class.forName(filterCriteria);
+
+            for (TablePosition pos : selectedCells) {
+                var cell = model.getCellIfExists(pos.getRow(), pos.getColumn()).orElse(null);
+                if (cell != null && cell.getValue() != null) {
+                    if (!filterType.isInstance(cell.getValue())) {
+                        table.getSelectionModel().clearSelection(pos.getRow());
+                    } else {
+                        table.getSelectionModel().select(pos.getRow());
+                    }
+                }
+            }
+        } catch (ClassNotFoundException e) {
+            System.out.println("Invalid type: " + filterCriteria);
+        }
+    }
+
+    private void applyRangeFilter(ObservableList<TablePosition> selectedCells, String filterCriteria) {
+        String[] range = filterCriteria.split(",");
+        if (range.length == 2) {
+            String[] rows = range[0].split("-");
+            String[] cols = range[1].split("-");
+
+            try {
+                int startRow = Integer.parseInt(rows[0]);
+                int endRow = Integer.parseInt(rows[1]);
+                int startCol = Integer.parseInt(cols[0]);
+                int endCol = Integer.parseInt(cols[1]);
+
+                for (TablePosition pos : selectedCells) {
+                    var cell = model.getCellIfExists(pos.getRow(), pos.getColumn()).orElse(null);
+                    if (cell != null) {
+                        if (pos.getRow() < startRow || pos.getRow() > endRow || pos.getColumn() < startCol || pos.getColumn() > endCol) {
+                            table.getSelectionModel().clearSelection(pos.getRow());
+                        } else {
+                            table.getSelectionModel().select(pos.getRow());
+                        }
+                    }
+                }
+            } catch (NumberFormatException e) {
+                System.out.println("Invalid range format: " + filterCriteria);
+            }
+        }
     }
 
     public static void main(String[] args) {
