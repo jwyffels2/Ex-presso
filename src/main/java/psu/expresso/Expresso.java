@@ -12,7 +12,8 @@ import javafx.scene.layout.BorderPane;
 import javafx.stage.Stage;
 import javafx.util.StringConverter;
 import psu.expresso.model.*;
-import java.util.List;
+import javafx.stage.FileChooser;
+import java.io.File;
 
 public class Expresso extends Application {
     private static final int NUM_ROWS = 1000;
@@ -21,6 +22,8 @@ public class Expresso extends Application {
     private SpreadsheetModel<Object> model;
     private FormulaEngine engine;
     private TableView<Integer> table;
+
+    private SpreadsheetModel<Object>.SpreadsheetIOManager ioManager;
 
     /** Parses raw text → Double or String; blank→null */
     private final StringConverter<Object> dynamicConverter = new StringConverter<>() {
@@ -38,6 +41,7 @@ public class Expresso extends Application {
     public void start(Stage stage) {
         model  = new SpreadsheetModel<>(NUM_ROWS, NUM_COLS);
         engine = new FormulaEngine(model);
+        ioManager = model.new SpreadsheetIOManager(model);
 
         table  = createTableView();
         ToolBar ribbon = createRibbon();
@@ -93,23 +97,23 @@ public class Expresso extends Application {
         return col;
     }
 
-    private TableColumn<Integer,Object> dataColumn(int ci) {
-        TableColumn<Integer,Object> col = new TableColumn<>(toColName(ci));
+    private TableColumn<Integer, Object> dataColumn(int ci) {
+        TableColumn<Integer, Object> col = new TableColumn<>(toColName(ci));
         col.setPrefWidth(100);
 
-        // display the computed displayValue
+        // Display the computed displayValue
         col.setCellValueFactory(cd ->
                 model.getCellIfExists(cd.getValue(), ci)
                         .<ReadOnlyObjectWrapper<Object>>map(c ->
                                 new ReadOnlyObjectWrapper<>(c.getDisplayValue()))
-                        .orElseGet(() ->
-                                new ReadOnlyObjectWrapper<>(null))
+                        .orElseGet(() -> new ReadOnlyObjectWrapper<>(null))
         );
 
-        // custom editor: edits raw value, shows displayValue
-        col.setCellFactory(tc -> new TableCell<Integer,Object>() {
+        // Custom editor: edits raw value, shows displayValue
+        col.setCellFactory(tc -> new TableCell<>() {
             private TextField editor;
-            @Override protected void updateItem(Object item, boolean empty) {
+            @Override
+            protected void updateItem(Object item, boolean empty) {
                 super.updateItem(item, empty);
                 if (empty) {
                     setText(null); setGraphic(null);
@@ -120,7 +124,9 @@ public class Expresso extends Application {
                     setGraphic(null);
                 }
             }
-            @Override public void startEdit() {
+
+            @Override
+            public void startEdit() {
                 super.startEdit();
                 if (editor == null) {
                     editor = new TextField();
@@ -134,12 +140,15 @@ public class Expresso extends Application {
                 editor.requestFocus();
                 editor.selectAll();
             }
-            @Override public void cancelEdit() {
+
+            @Override
+            public void cancelEdit() {
                 super.cancelEdit();
                 setGraphic(null);
                 Object dv = getItem();
                 setText(dv == null ? "" : dv.toString());
             }
+
             private void commitEditFromEditor() {
                 String raw = editor.getText();
                 int row = getIndex();
@@ -188,21 +197,49 @@ public class Expresso extends Application {
             table.refresh();
         });
 
+        // Filter button.
         Button filterButton = new Button("Filter");
         filterButton.setOnAction(ev -> {
             showFilterPopup();
         });
 
+        // Format button.
+        Button formatButton = new Button("Format");
+        formatButton.setOnAction(ev -> applyFormat());
+
+        // Open button.
+        Button openButton = new Button("Open");
+        openButton.setOnAction(ev -> {
+            FileChooser chooser = new FileChooser();
+            chooser.setTitle("Open Spreadsheet File");
+            File file = chooser.showOpenDialog(null);
+            if (file != null) {
+                ioManager.loadFromFile(file);
+                table.refresh();
+            }
+        });
+
+        // Save button.
+        Button saveButton = new Button("Save");
+        saveButton.setOnAction(ev -> {
+            FileChooser chooser = new FileChooser();
+            chooser.setTitle("Save Spreadsheet File");
+            File file = chooser.showSaveDialog(null);
+            if (file != null) {
+                ioManager.saveToFile(file);
+            }
+        });
+
         return new ToolBar(
                 new Button("New"),
-                new Button("Open"),
-                new Button("Save"),
+                openButton,
+                saveButton,
                 new Separator(),
                 new Button("Undo"),
                 new Button("Redo"),
                 new Separator(),
                 new Label("fx:"), fx,
-                new Separator(), filterButton
+                new Separator(), filterButton, formatButton
         );
     }
 
@@ -291,6 +328,25 @@ public class Expresso extends Application {
                 System.out.println("Invalid range format: " + filterCriteria);
             }
         }
+    }
+
+    private void applyFormat() {
+        ObservableList<TablePosition> selectedCells = table.getSelectionModel().getSelectedCells();
+
+        for (TablePosition pos : selectedCells) {
+            var cell = model.getCellIfExists(pos.getRow(), pos.getColumn()).orElse(null);
+            if (cell != null) {
+                boolean isStyled = cell.displayValue().contains("font-weight: bold");
+                String fontWeight = isStyled ? "normal" : "bold";
+                String color = isStyled ? "black" : "blue";
+
+                FontStyleDecorator font = new FontStyleDecorator(cell, fontWeight, color);
+                BorderDecorator border = new BorderDecorator(font);
+                border.applyTo(cell);
+            }
+        }
+
+        table.refresh();
     }
 
     public static void main(String[] args) {

@@ -20,6 +20,9 @@ public class CellDataModel<T>
     private Consumer<CellDataModel<T>> updateLambda;
     private DecoratorIF wrappedCell; // This will store the decorator.
 
+    public CellDataModel() {
+        this.wrappedCell = this; // Just the base cell without the decoration.
+    }
     // Set the decorator, e.g., to apply font styling
     public void setDecorator(DecoratorIF decorator) {
         this.wrappedCell = decorator;
@@ -74,9 +77,8 @@ public class CellDataModel<T>
         return location;
     }
 
-    // Useful for Decorator.
     @Override
     public String displayValue() {
-        return wrappedCell.displayValue();
+        return wrappedCell.displayValue(); // Delegates to the decorator.
     }
 }

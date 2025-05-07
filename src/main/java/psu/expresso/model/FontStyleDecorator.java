@@ -31,7 +31,7 @@ public class FontStyleDecorator implements DecoratorIF {
      */
     @Override
     public String displayValue() {
-        // Optionally, return decorated value with added styling
-        return "<span style='font-family:" + font + "; color:" + color + ";'>" + wrappedCell.displayValue() + "</span>";
+        String content = wrappedCell != null ? wrappedCell.displayValue() : "";
+        return "<span style='font-weight: " + font + "; color: " + color + ";'>" + content + "</span>";
     }
 }
